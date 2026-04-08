@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ответы">
+    <meta name="theme-color" content="#0F4C75">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+    </script>
+    <title>Ответы</title>
+</head>
+<body>
+<div class="container">
+    <div class="label">КИМ</div>
+    <input type="number" id="kimInput" placeholder="" inputmode="numeric">
+
+    <div class="label">задача</div>
+    <input type="number" id="taskInput" placeholder="" inputmode="numeric">
+
+    <button class="btn-answer" onclick="search()">ОТВЕТ</button>
+
+    <div class="answer-box">
+        <div class="answer-text" id="answerText">ответ</div>
+    </div>
+
+    <a class="video-link" id="videoLink" style="display:none" target="_blank">Открыть видео</a>
+
+    <div class="bottom">
+        <div class="count-text" id="countText">Задач: 0</div>
+        <button class="btn-csv" onclick="document.getElementById('fileInput').click()">
+            Загрузить CSV
+        </button>
+        <input type="file" id="fileInput" accept=".csv,text/csv" onchange="loadCsv(event)">
+    </div>
+</div>
+
+<div class="snackbar" id="snackbar"></div>
+
+<script>
+    // База данных в памяти
+    let tasks = [];
+
+    // Загружаем из localStorage при старте
+    window.onload = function() {
+        const saved = localStorage.getItem('tasks');
+        if (saved) {
+            tasks = JSON.parse(saved);
+            updateCount();
+        }
+    };
+
+    function search() {
+        const kim = document.getElementById('kimInput').value.trim();
+        const task = document.getElementById('taskInput').value.trim();
+
+        if (!kim || !task) return;
+
+        const result = tasks.find(t => t.kim === kim && t.task === task);
+
+        const answerEl = document.getElementById('answerText');
+        const videoEl = document.getElementById('videoLink');
+
+        if (result) {
+            answerEl.textContent = result.answer;
+            if (result.link && result.link.startsWith('http')) {
+                videoEl.href = result.link;
+                videoEl.style.display = 'block';
+            } else {
+                videoEl.style.display = 'none';
+            }
+        } else {
+            answerEl.textContent = 'Не найдено';
+            videoEl.style.display = 'none';
+        }
+    }
+
+    function loadCsv(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let text = e.target.result;
+
+            // Определяем кодировку
+            if (text.includes('')) {
+                reader.readAsText(file, 'ISO-8859-1');
+                return;
+            }
+
+            parseCsv(text);
+        };
+
+        reader.onload = function(e) {
+            parseCsv(e.target.result);
+        };
+
+        // Пробуем UTF-8 сначала
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function parseCsv(text) {
+        tasks = [];
+        const records = readAllRecords(text);
+
+        if (records.length < 2) return;
+
+        // Первая строка заголовки (номера КИМов)
+        const headers = records[0];
+        const kimNumbers = headers.slice(1).map(h => h.split('\n')[0].trim());
+
+        // Задачи
+        for (let i = 1; i < records.length; i++) {
+            const cells = records[i];
+            if (!cells.length) continue;
+
+            const taskNumber = cells[0].split('\n')[0].trim();
+            if (!taskNumber) continue;
+
+            for (let j = 1; j < cells.length; j++) {
+                if (j - 1 >= kimNumbers.length) break;
+
+                const kimNumber = kimNumbers[j - 1];
+                const cellContent = cells[j].trim();
+                if (!cellContent || !kimNumber) continue;
+
+                const lines = cellContent.split('\n').map(l => l.trim());
+
+                // Ответ
+                const answerLines = lines.filter(l =>
+                    l && !l.includes('http://') && !l.includes('https://')
+                    && !l.includes('youtu.be') && !l.includes('vk.com')
+                );
+                const answer = answerLines.join('\n').trim().replace(/"+$/, '');
+
+                // Ссылка
+                const link = lines.find(l =>
+                    l.startsWith('http://') || l.startsWith('https://')
+                ) || '';
+
+                if (answer) {
+                    tasks.push({
+                        kim: kimNumber,
+                        task: taskNumber,
+                        answer: answer,
+                        link: link
+                    });
+                }
+            }
+        }
+
+        // Сохраняем в localStorage
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        updateCount();
+        showSnackbar(`Загружено ${tasks.length} задач`);
+    }
+
+    // Парсер CSV с поддержкой многострочных ячеек
+    function readAllRecords(text) {
+        const records = [];
+        let cells = [];
+        let currentCell = '';
+        let inQuotes = false;
+        let i = 0;
+
+        while (i < text.length) {
+            const char = text[i];
+
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                cells.push(currentCell);
+                currentCell = '';
+            } else if ((char === '\n' || (char === '\r' && text[i+1] === '\n')) && !inQuotes) {
+                if (char === '\r') i++;
+                cells.push(currentCell);
+                records.push(cells);
+                cells = [];
+                currentCell = '';
+            } else {
+                currentCell += char;
+            }
+            i++;
+        }
+
+        if (currentCell || cells.length) {
+            cells.push(currentCell);
+            records.push(cells);
+        }
+
+        return records;
+    }
+
+    function updateCount() {
+        document.getElementById('countText').textContent = `Задач: ${tasks.length}`;
+    }
+
+    function showSnackbar(msg) {
+        const el = document.getElementById('snackbar');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    // Enter для поиска
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter') search();
+    });
+</script>
+</body>
+</html>

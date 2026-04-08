@@ -1,0 +1,15 @@
+{
+  "name": "Ответы КИМ",
+  "short_name": "Ответы",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F4C75",
+  "theme_color": "#0F4C75",
+  "icons": [
+    {
+      "src": "image/mainPhoto.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    }
+  ]
+}
