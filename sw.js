@@ -1,8 +1,15 @@
+const CACHE = 'answers-v1';
+const FILES = [
+    './',
+    './index.html',
+    './style.css',
+    './index.js',
+    './manifest.json'
+];
+
 self.addEventListener('install', e => {
     e.waitUntil(
-        caches.open('answers-v1').then(cache => {
-            return cache.addAll(['/', '/index.html']);
-        })
+        caches.open(CACHE).then(cache => cache.addAll(FILES))
     );
 });
 

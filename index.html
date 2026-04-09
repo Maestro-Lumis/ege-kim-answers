@@ -19,10 +19,10 @@
 <body>
 <div class="container">
     <div class="label">КИМ</div>
-    <input type="number" id="kimInput" placeholder="" inputmode="numeric">
+    <input type="text" inputmode="numeric" pattern="[0-9]*" id="kimInput">
 
     <div class="label">задача</div>
-    <input type="number" id="taskInput" placeholder="" inputmode="numeric">
+    <input type="text" inputmode="numeric" pattern="[0-9]*" id="taskInput">
 
     <button class="btn-answer" onclick="search()">ОТВЕТ</button>
 
@@ -38,6 +38,9 @@
             Загрузить CSV
         </button>
         <input type="file" id="fileInput" accept=".csv,text/csv" onchange="loadCsv(event)">
+        <button class="btn-csv" id="installBtn" style="display:none">
+            Установить приложение
+        </button>
     </div>
 </div>
 
